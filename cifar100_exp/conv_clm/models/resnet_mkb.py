@@ -16,24 +16,24 @@ def resnet20_mkb(inputs,
         net_id,
         emb_size=128,
         is_training=True,
-        is_mkb_reused=False,
+        is_mkb_reuse=False,
         scope="Resnet20-mkb"):
-    return resnet_mkb(inputs, net_id, emb_size, is_training, is_mkb_reused, scope, num_layers=20)
+    return resnet_mkb(inputs, net_id, emb_size, is_training, is_mkb_reuse, scope, num_layers=20)
 
 def resnet32_mkb(inputs,
         net_id,
         emb_size=128,
         is_training=True,
-        is_mkb_reused=False,
+        is_mkb_reuse=False,
         scope="Resnet32-mkb"):
-    return resnet(inputs, net_id, emb_size, is_training, is_mkb_reused, scope, num_layers=32)
+    return resnet_mkb(inputs, net_id, emb_size, is_training, is_mkb_reuse, scope, num_layers=32)
 
 
 def resnet_mkb(inputs,
         net_id,
         emb_size,
         is_training,
-        is_mkb_reused,
+        is_mkb_reuse,
         scope,
         num_layers):
 
@@ -232,14 +232,15 @@ def resnet_mkb(inputs,
 
         print('-------------conv1--------------------')
         print(layers[-1])
-        res.append(layers[-1])
 
         ######################MKB 1################################################
+        print('mkb_reuse', mkb_reuse)
         with tf.variable_scope('mkb-1', reuse=mkb_reuse):
             mkb1 = clm.clm_shared(layers[-1], 16, padding='SAME')
             mkb1 = mkb1 + layers[-1]
             layers.append(mkb1)
         ######################MKB 1################################################
+        res.append(layers[-1])
 
         for i in range(n):
             with tf.variable_scope('net_'+str(net_id)+'/conv2_%d' %i, reuse=reuse):
@@ -249,7 +250,6 @@ def resnet_mkb(inputs,
 
         print('-------------conv2--------------------')
         print(layers[-1])
-        res.append(layers[-1])
 
         ######################MKB 2################################################
         with tf.variable_scope('mkb-2', reuse=mkb_reuse):
@@ -257,6 +257,7 @@ def resnet_mkb(inputs,
             mkb2 = mkb2 + layers[-1]
             layers.append(mkb2)
         ######################MKB 2################################################
+        res.append(layers[-1])
 
         for i in range(n):
             with tf.variable_scope('net_'+str(net_id)+'/conv3_%d' %i, reuse=reuse):
@@ -267,7 +268,6 @@ def resnet_mkb(inputs,
 
         print('-------------conv3--------------------')
         print(layers[-1])
-        res.append(layers[-1])
 
         ######################MKB 3################################################
         with tf.variable_scope('mkb-3', reuse=mkb_reuse):
@@ -275,6 +275,7 @@ def resnet_mkb(inputs,
             mkb3 = mkb3 + layers[-1]
             layers.append(mkb3)
         ######################MKB ################################################
+        res.append(layers[-1])
 
 
         with tf.variable_scope('net_'+str(net_id), reuse=reuse):
@@ -293,14 +294,14 @@ def resnet_mkb(inputs,
             print('-------------fc--------------------')
             print(layers[-1])
 
-        return layers[-1], shared_emb, outputs
+        return layers[-1], res
 
     if num_layers == 20:
         print('\n==================Resnet 20==============================')
-        return inference(inputs, net_id, 3, is_training, is_mkb_reused)
+        return inference(inputs, net_id, 3, is_training, is_mkb_reuse)
     elif num_layers == 32:
         print('\n==================Resnet 32==============================')
-        return inference(inputs, net_id, 5, is_training, is_mkb_reused)
+        return inference(inputs, net_id, 5, is_training, is_mkb_reuse)
 
 """
 def test_graph(train_dir='logs'):

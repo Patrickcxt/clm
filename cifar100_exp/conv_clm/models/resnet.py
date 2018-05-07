@@ -16,6 +16,7 @@ def resnet20(inputs,
         net_id,
         emb_size=128,
         is_training=True,
+        is_mkb_reuse=False,
         scope='Resnet20'):
     return resnet(inputs, net_id, emb_size, is_training, scope, num_layers=20)
 
@@ -23,6 +24,7 @@ def resnet32(inputs,
         net_id,
         emb_size=128,
         is_training=True,
+        is_mkb_reuse=False,
         scope='Resnet32'):
     return resnet(inputs, net_id, emb_size, is_training, scope, num_layers=32)
 
@@ -30,6 +32,7 @@ def resnet44(inputs,
         net_id,
         emb_size=128,
         is_training=True,
+        is_mkb_reuse=False,
         scope='Resnet44'):
     return resnet(inputs, net_id, emb_size, is_training, scope, num_layers=44)
 
@@ -37,6 +40,7 @@ def resnet56(inputs,
         net_id,
         emb_size=128,
         is_training=True,
+        is_mkb_reuse=False,
         scope='Resnet56'):
     return resnet(inputs, net_id, emb_size, is_training, scope, num_layers=56)
 
@@ -206,6 +210,7 @@ def resnet(inputs,
         '''
 
         layers = []
+        res = []
         #dataset = "mnist"
         dataset = 'cifar'
         #dataset = 'stl10'
@@ -241,6 +246,7 @@ def resnet(inputs,
 
             print('-------------conv1--------------------')
             print(layers[-1])
+            res.append(layers[-1])
 
             for i in range(n):
                 with tf.variable_scope('conv2_%d' %i, reuse=reuse):
@@ -250,6 +256,7 @@ def resnet(inputs,
 
             print('-------------conv2--------------------')
             print(layers[-1])
+            res.append(layers[-1])
 
             for i in range(n):
                 with tf.variable_scope('conv3_%d' %i, reuse=reuse):
@@ -260,6 +267,7 @@ def resnet(inputs,
 
             print('-------------conv3--------------------')
             print(layers[-1])
+            res.append(layers[-1])
 
         with tf.variable_scope('net_'+str(net_id), reuse=reuse):
             with tf.variable_scope('fc', reuse=reuse):
@@ -276,7 +284,7 @@ def resnet(inputs,
             print('-------------fc--------------------')
             print(layers[-1])
 
-        return layers[-1]
+        return layers[-1], res
 
     if num_layers == 20:
         print('\n==================Resnet 20==============================')

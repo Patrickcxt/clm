@@ -106,7 +106,10 @@ def main(_):
     model.add_kl_loss(0, sup_logit_1, sup_logit_0, weight=0.01)
     model.add_kl_loss(1, sup_logit_0, sup_logit_1, weight=0.01)
 
-    # Add losses after between clm
+    # Add mse losses between mkb
+    for i in range(len(sup_res_0)):
+        print('res ', i)
+        model.add_mse_loss(sup_res_0[i], sup_res_1[i], 'l2', weight=0.1)
     """
     sup_shared_0 = slim.flatten(sup_shared_0, scope='kl_flatten_0')
     #sup_shared_0 = model.shared_to_embedding(sup_shared_0, 128, is_training=False)
@@ -130,7 +133,7 @@ def main(_):
         30000,
         0.1,
         staircase=True)
-    train_op = model.create_train_op_type(t_learning_rate,'kl')
+    train_op = model.create_train_op_type(t_learning_rate,'all')
     #train_op = model.create_train_op(t_learning_rate)
 
 
@@ -154,7 +157,7 @@ def main(_):
         for step in xrange(FLAGS.max_steps):
 
           images_0, labels_0 = dl.get_next_batch(0)
-          _, total_losses, logit_losses,  kl_losses, summaries = sess.run([train_op, model.train_loss, model.logit_loss,  model.kl_loss, summary_op],
+          _, total_losses, logit_losses, mse_losses,  kl_losses, summaries = sess.run([train_op, model.train_loss, model.logit_loss, model.mse_loss,  model.kl_loss, summary_op],
                                                           feed_dict={sup_images_0: images_0,
                                                                      sup_labels_0: labels_0,
                                                                      sup_images_1: images_0,
@@ -174,7 +177,7 @@ def main(_):
             print('logit_loss: ', logit_losses)
             #print('cosine_loss: ', cosine_losses)
             print('kl_loss: ', kl_losses)
-            #print('mse_loss: ', mse_losses)
+            print('mse_loss: ', mse_losses)
             #print('kl_loss: ' + str(kl_losses_0) + ' ' + str(kl_losses_1))
             #print('visit_loss: ' + str(visit_losses[0]) + ' ' + str(visit_losses[1]))
             print()

@@ -2,7 +2,7 @@ import os
 import re
 
 import tensorflow as tf
-import tensorlayer as tl
+#import tensorlayer as tl
 import tensorflow.contrib.slim as slim
 import tensorflow.python.platform
 from tensorflow.python.platform import gfile
@@ -69,18 +69,19 @@ def clm_dec(inputs, net_id, out_channel,  stride=[1, 1, 1, 1], padding='SAME', i
         #return decoder(inputs, out_channel, out_shape, stride, padding)
         return encoder(inputs, out_channel, stride, padding)
 
-def clm_shared(inputs, out_channel, padding='SAME', l2_weight=1e-3):
+def clm_shared(inputs, out_channel, padding='SAME', l2_weight=1e-3, reuse=False):
     with slim.arg_scope([slim.conv2d],
             activation_fn=None,
             weights_regularizer=slim.l2_regularizer(l2_weight)):
-
             preds = inputs
-            preds = slim.conv2d(preds, out_channel, [3, 3], scope='conv1', padding=padding)
-            preds = batch_normalization_layer(preds, out_channel)
-            preds = tf.nn.relu(preds)
+            with tf.variable_scope('clm_layer_1', reuse=reuse):
+                preds = slim.conv2d(preds, out_channel, [3, 3], scope='conv1', padding=padding)
+                preds = batch_normalization_layer(preds, out_channel)
+                preds = tf.nn.relu(preds)
 
-            preds = slim.conv2d(preds, out_channel, [3, 3], scope='conv2', padding=padding)
-            preds = batch_normalization_layer(preds, out_channel)
-            preds = tf.nn.relu(preds)
+            with tf.variable_scope('clm_layer_2', reuse=reuse):
+                preds = slim.conv2d(preds, out_channel, [3, 3], scope='conv2', padding=padding)
+                preds = batch_normalization_layer(preds, out_channel)
+                preds = tf.nn.relu(preds)
     return preds
 

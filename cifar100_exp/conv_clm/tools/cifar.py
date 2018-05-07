@@ -34,7 +34,7 @@ def get_dataset_cifar10(subset):
     if subset == 'training':
         print('Fetching the training dataset ...')
         for i in range(5):
-            f = open('../../data/cifar-10-batches-py/data_batch_' + str(i+1), 'rb')
+            f = open('/home/amax/cxt/cll/data/cifar-10-batches-py/data_batch_' + str(i+1), 'rb')
             dic = cPickle.load(f)
             if i == 0:
                 images, labels = dic['data'], dic['labels']
@@ -43,7 +43,7 @@ def get_dataset_cifar10(subset):
                 labels += dic['labels']
     else:
         print('Fetching the test dataset ...')
-        f = open('../../data/cifar-10-batches-py/test_batch', 'rb')
+        f = open('/home/amax/cxt/cll/data/cifar-10-batches-py/test_batch', 'rb')
         dic = cPickle.load(f)
         images, labels = dic['data'], dic['labels']
 

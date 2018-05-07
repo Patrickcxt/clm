@@ -3,7 +3,6 @@ import re
 import sys
 
 import tensorflow as tf
-import tensorlayer as tl
 import tensorflow.python.platform
 from tensorflow.python.platform import gfile
 import numpy as np
@@ -27,10 +26,11 @@ import backend
 
 
 class data_layer:
-    def __init__(self, dataset):
+    def __init__(self, dataset, batch_size):
         # Get cifar data
         print('-----------------------------data_layer--------------------------------')
         self.dataset = dataset
+        self.batch_size = batch_size
         if dataset == 'cifar10':
             print('--------loading cifar10 dataset------------------')
             self.train_images, self.train_labels, self.valid_images, self.valid_labels  = cifar_tools.get_dataset_cifar10('training')
@@ -68,7 +68,6 @@ class data_layer:
 
         self.it = [0, 0]
         self.perm = [[], []]
-        self.batch_size = 64
         print('-----------------------------data_layer--------------------------------')
 
     def get_next_batch(self, net_id):

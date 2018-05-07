@@ -126,7 +126,7 @@ class SemisupModel(object):
     self.step = [tf.Variable(0, trainable=False), tf.Variable(0, trainable=False)]
     #self.ema = tf.train.ExponentialMovingAverage(0.99, self.step[0])
 
-    self.test_batch_size = 50
+    self.test_batch_size = 100
 
     self.model_func = model_func
 
@@ -137,25 +137,26 @@ class SemisupModel(object):
 
 
     self.test_emb, self.test_shared, self.test_logit = [], [], []
+    mkb_reuse = False
     for i in range(len(self.model_func)):
-        test_emb_0 = self.image_to_embedding(i, self.test_in, is_training=False)
+        test_emb_0, _ = self.image_to_embedding(i, self.test_in, is_training=False, is_mkb_reuse=mkb_reuse)
         test_logit_0 = self.embedding_to_logit(i, test_emb_0, is_training=False)
         self.test_emb.append(test_emb_0)
         #self.test_shared.append(test_shared_0)
         self.test_logit.append(test_logit_0)
-
+        mkb_reuse = True
 
     self.logit_loss, self.kl_loss, self.mse_loss, self.cosine_loss = [], [], [], []
     for i in range(len(self.model_func)):
         self.logit_loss.append([])
-        self.mse_loss.append(None)
+        #self.mse_loss.append(None)
         self.cosine_loss.append(None)
         self.kl_loss.append([])
 
-  def image_to_embedding(self, net_id, images, is_training=True):
+  def image_to_embedding(self, net_id, images, is_training=True, is_mkb_reuse=True):
     """Create a graph, transforming images into embedding vectors."""
    #with tf.variable_scope('net_'+str(net_id), reuse=is_training):
-    return self.model_func[net_id](images, net_id, is_training=is_training)
+    return self.model_func[net_id](images, net_id, is_training=is_training, is_mkb_reuse=is_mkb_reuse)
 
 
   def embedding_to_logit(self, net_id, embedding, is_training=True):
@@ -347,25 +348,21 @@ class SemisupModel(object):
 
     tf.summary.scalar('Loss_KL_Net_'+str(net_id) + '_' + str(len(self.kl_loss[net_id])), kl_loss)
 
-  def add_emb_loss(self, logits_1, logits_2, l_num, weight=1.0, smoothing=0.0):
+  def add_mse_loss(self, logits_1, logits_2, l_num, weight=1.0, smoothing=0.0):
     """Add mse divergence loss to the model."""
     if l_num == 'l1':
         #mse_loss = weight * tf.reduce_sum(tf.abs(logits_1-logits_2)**l_num)
         dist = tf.reduce_sum(tf.abs(tf.subtract(logits_1, logits_2)), 1)
         mse_loss = weight * tf.reduce_mean(tf.maximum(dist, 0.0), 0)
     elif l_num == 'l2':
-        #mse_loss = weight * tf.sqrt(tf.reduce_sum(tf.abs(logits_1-logits_2)**l_num))
+        """
         dist = tf.reduce_sum(tf.square(tf.subtract(logits_1, logits_2)), 1)
         mse_loss = weight * tf.reduce_mean(tf.maximum(dist, 0.0), 0)
-    """
-    elif l_num = 'cos':
-        dist = tf.reduce_sum(logits_1*logits_2, 1)
-        mse_loss = weight * tf.reduce_mean()
-    """
+        """
+        mse_loss = weight * tf.reduce_mean(tf.square(logits_1-logits_2))
 
-    for i in range(len(self.mse_loss)):
-        self.mse_loss[i] = mse_loss
-        tf.summary.scalar('Loss_MSE_Net_'+str(i), self.mse_loss[i])
+    self.mse_loss.append(mse_loss)
+    tf.summary.scalar('Loss_MSE_MKB_'+str(len(self.mse_loss)), mse_loss)
 
   def add_cosine_loss(self, net_id, logits_1, logits_2, weight=1.0, smoothing=0.0):
     """Add supervised classification loss to the model."""
@@ -444,7 +441,7 @@ class SemisupModel(object):
     elif tp == 'mse':
         self.train_loss = tf.losses.get_total_loss() + self.mse_loss[0]
     elif tp == 'all':
-        self.train_loss = tf.losses.get_total_loss() + tf.add_n([self.mse_loss[0]] + self.kl_loss[0] + self.kl_loss[1])
+        self.train_loss = tf.losses.get_total_loss() + tf.add_n(self.mse_loss + self.kl_loss[0] + self.kl_loss[1])
     elif tp == 'cosine':
         self.train_loss = tf.losses.get_total_loss()
 
