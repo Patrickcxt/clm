@@ -57,7 +57,8 @@ flags.DEFINE_string('subset', 'train', 'Training or test.')
 from tools import cifar as cifar_tools
 #from conviz import conviz
 from data_layer import data_layer
-from models import resnet_mkb
+#from models import resnet_mkb_old as resnet_mkb
+from models import resnet_mkb as resnet_mkb
 
 NUM_LABELS = cifar_tools.NUM_LABELS
 IMAGE_SHAPE = cifar_tools.IMAGE_SHAPE
@@ -128,10 +129,10 @@ def main(_):
 
 
     t_learning_rate = tf.train.exponential_decay(
-        1e-1,
+        FLAGS.learning_rate,
         model.step[0],
-        30000,
-        0.1,
+        FLAGS.decay_steps,
+        FLAGS.decay_factor,
         staircase=True)
     train_op = model.create_train_op_type(t_learning_rate,'all')
     #train_op = model.create_train_op(t_learning_rate)
@@ -141,7 +142,7 @@ def main(_):
 
     summary_writer = tf.summary.FileWriter(FLAGS.logdir+'/summaries/', graph)
 
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(max_to_keep=10)
 
   gpuConfig = tf.ConfigProto()
   gpuConfig.gpu_options.allow_growth = True
@@ -183,8 +184,8 @@ def main(_):
             print()
 
             train_err_0, train_err_1 = valid_and_test(model, images_0, labels_0)
-            print('Train error resnet: %.2f %%' % train_err_0)
-            print('Train error small: %.2f %%' % train_err_1)
+            print('Train error resnet32: %.2f %%' % train_err_0)
+            print('Train error resnet20: %.2f %%' % train_err_1)
 
             train_summary_0 = tf.Summary(
                 value=[tf.Summary.Value(
@@ -215,18 +216,19 @@ def main(_):
 
             valid_summary_1 = tf.Summary(
                 value=[tf.Summary.Value(
-                    tag='Valid Err smallnet', simple_value=valid_err_1)])
+                    tag='Valid Err resnet20', simple_value=valid_err_1)])
             summary_writer.add_summary(summaries, step)
             summary_writer.add_summary(valid_summary_0, step)
             summary_writer.add_summary(valid_summary_1, step)
 
+        if (step + 1) % 10000 == 0:
             saver.save(sess, FLAGS.logdir+'/models/model', model.step[0])
 
         print('=====================Test Error===============================')
         test_err_0, test_err_1 = valid_and_test(model, test_images, test_labels)
         print('Test error: %.2f %%, %.2f%%' % (test_err_0, test_err_1))
     else:
-        saver.restore(sess, './save_cifar100/r32_r20/models/model-58000')
+        saver.restore(sess, './save_cifar100/r32_r20_mse/models/model-71000')
         print('=====================Test Error===============================')
         test_err_0, test_err_1 = valid_and_test(model, test_images, test_labels)
         print('Test error: %.2f %%, %.2f%%' % (test_err_0, test_err_1))

@@ -43,14 +43,14 @@ flags.DEFINE_integer('sup_batch_size', 128,
 flags.DEFINE_integer('eval_interval', 500,
                      'Number of steps between evaluations.')
 
-flags.DEFINE_float('learning_rate', 1e-1, 'Initial learning rate.')
+#flags.DEFINE_float('learning_rate', 0.5e-1, 'Initial learning rate.')
 
-flags.DEFINE_float('decay_factor', 0.1, 'Learning rate decay factor.')
+#flags.DEFINE_float('decay_factor', 0.1, 'Learning rate decay factor.')
 
 flags.DEFINE_float('decay_steps', 30000,
                    'Learning rate decay interval in steps.')
 
-flags.DEFINE_integer('max_steps', 50000, 'Number of training steps.')
+flags.DEFINE_integer('max_steps', 64000, 'Number of training steps.')
 
 flags.DEFINE_string('logdir', '/tmp/semisup_mnist', 'Training log path.')
 
@@ -58,7 +58,9 @@ flags.DEFINE_string('subset', 'train', 'Training or test.')
 
 from tools import cifar as cifar_tools
 from data_layer import data_layer
-from models import resnet
+#from models import resnet_old as resnet
+#from models import resnet as resnet
+from models import resnet_mkb as resnet_mkb
 
 NUM_LABELS = cifar_tools.NUM_LABELS
 IMAGE_SHAPE = cifar_tools.IMAGE_SHAPE
@@ -82,7 +84,8 @@ def main(_):
 
   graph = tf.Graph()
   with graph.as_default():
-    model_func = [resnet.resnet20]
+    #model_func = [resnet.resnet32]
+    model_func = [resnet_mkb.resnet20_mkb]
     model = backend.SemisupModel(model_func, NUM_LABELS, IMAGE_SHAPE)
 
     # Set up inputs.
@@ -97,18 +100,24 @@ def main(_):
     # Add losses.
     model.add_logit_loss(0, sup_logit_0, sup_labels_0)
 
+    """
     t_learning_rate = tf.train.exponential_decay(
         FLAGS.learning_rate,
         model.step[0],
         FLAGS.decay_steps,
         FLAGS.decay_factor,
         staircase=True)
+    """
+    t_learning_rate = tf.train.piecewise_constant(
+        model.step[0],
+        [32000, 48000],
+        [1e-1, 1e-2, 1e-3])
     train_op = model.create_train_op(t_learning_rate)
     summary_op = tf.summary.merge_all()
 
     summary_writer = tf.summary.FileWriter(FLAGS.logdir+'/summaries/', graph)
 
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(max_to_keep=10)
 
   gpuConfig = tf.ConfigProto()
   gpuConfig.gpu_options.allow_growth = True
@@ -146,6 +155,7 @@ def main(_):
             summary_writer.add_summary(summaries, step)
             summary_writer.add_summary(valid_summary_0, step)
 
+        if (step+1) % 10000 == 0:
             saver.save(sess, FLAGS.logdir+'/models/model', model.step[0])
 
         print('=========================Test Error+==============================')

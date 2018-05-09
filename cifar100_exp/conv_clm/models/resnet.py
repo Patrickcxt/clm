@@ -98,6 +98,7 @@ def resnet(inputs,
         return fc_h
 
 
+    """
     def batch_normalization_layer(input_layer, dimension):
         '''
         Helper function to do batch normalziation
@@ -113,9 +114,17 @@ def resnet(inputs,
         bn_layer = tf.nn.batch_normalization(input_layer, mean, variance, beta, gamma, BN_EPSILON)
 
         return bn_layer
+    """
+
+    def batch_normalization_layer(input_layer, is_training):
+        _BATCH_NORM_DECAY = 0.997
+        _BATCH_NORM_EPSILON = 1e-3
+        return tf.layers.batch_normalization(
+            inputs=input_layer, axis=3, momentum=_BATCH_NORM_DECAY, epsilon=_BATCH_NORM_EPSILON,
+            center=True, scale=True, training=is_training, fused=True)
 
 
-    def conv_bn_relu_layer(input_layer, filter_shape, stride):
+    def conv_bn_relu_layer(input_layer, filter_shape, stride, bn_training):
         '''
         A helper function to conv, batch normalize and relu the input tensor sequentially
         :param input_layer: 4D tensor
@@ -128,13 +137,13 @@ def resnet(inputs,
         filter = create_variables(name='conv', shape=filter_shape)
 
         conv_layer = tf.nn.conv2d(input_layer, filter, strides=[1, stride, stride, 1], padding='SAME')
-        bn_layer = batch_normalization_layer(conv_layer, out_channel)
+        bn_layer = batch_normalization_layer(conv_layer, is_training=bn_training)
 
         output = tf.nn.relu(bn_layer)
         return output
 
 
-    def bn_relu_conv_layer(input_layer, filter_shape, stride):
+    def bn_relu_conv_layer(input_layer, filter_shape, stride, bn_training):
         '''
         A helper function to batch normalize, relu and conv the input layer sequentially
         :param input_layer: 4D tensor
@@ -145,7 +154,7 @@ def resnet(inputs,
 
         in_channel = input_layer.get_shape().as_list()[-1]
 
-        bn_layer = batch_normalization_layer(input_layer, in_channel)
+        bn_layer = batch_normalization_layer(input_layer, is_training=bn_training)
         relu_layer = tf.nn.relu(bn_layer)
 
         filter = create_variables(name='conv', shape=filter_shape)
@@ -154,7 +163,7 @@ def resnet(inputs,
 
 
 
-    def residual_block(input_layer, output_channel, first_block=False):
+    def residual_block(input_layer, output_channel, first_block=False, bn_training=True):
         '''
         Defines a residual block in ResNet
         :param input_layer: 4D tensor
@@ -180,10 +189,10 @@ def resnet(inputs,
                 filter = create_variables(name='conv', shape=[3, 3, input_channel, output_channel])
                 conv1 = tf.nn.conv2d(input_layer, filter=filter, strides=[1, 1, 1, 1], padding='SAME')
             else:
-                conv1 = bn_relu_conv_layer(input_layer, [3, 3, input_channel, output_channel], stride)
+                conv1 = bn_relu_conv_layer(input_layer, [3, 3, input_channel, output_channel], stride, bn_training=bn_training)
 
         with tf.variable_scope('conv2_in_block'):
-            conv2 = bn_relu_conv_layer(conv1, [3, 3, output_channel, output_channel], 1)
+            conv2 = bn_relu_conv_layer(conv1, [3, 3, output_channel, output_channel], 1, bn_training=bn_training)
 
         # When the channels of input layer and conv2 does not match, we add zero pads to increase the
         #  depth of input layers
@@ -219,16 +228,16 @@ def resnet(inputs,
                 if dataset == 'mnist':
                     input_tensor_batch = tf.pad(input_tensor_batch, [[0, 0], [2, 2], [2, 2], [0, 0]])
                     input_tensor_batch = tf.cast(input_tensor_batch, tf.float32) / 255.0
-                    conv0 = conv_bn_relu_layer(input_tensor_batch, [3, 3, 1, 16], 1)
+                    conv0 = conv_bn_relu_layer(input_tensor_batch, [3, 3, 1, 16], 1, bn_training=reuse)
                 elif dataset == 'cifar':
                     mean = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32, shape=[1, 1, 1, 3], name='img_mean')
                     input_tensor_batch = input_tensor_batch - mean
-                    conv0 = conv_bn_relu_layer(input_tensor_batch, [3, 3, 3, 16], 1)
+                    conv0 = conv_bn_relu_layer(input_tensor_batch, [3, 3, 3, 16], 1, bn_training=reuse)
                 elif dataset == 'stl10':
                     input_tensor_batch = tf.image.resize_images(input_tensor_batch, tf.constant([32, 32]), method=tf.image.ResizeMethod.BILINEAR)
                     mean = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32, shape=[1, 1, 1, 3], name='img_mean')
                     input_tensor_batch = input_tensor_batch - mean
-                    conv0 = conv_bn_relu_layer(input_tensor_batch, [3, 3, 3, 16], 1)
+                    conv0 = conv_bn_relu_layer(input_tensor_batch, [3, 3, 3, 16], 1, bn_training=reuse)
                 #activation_summary(conv0)
                 layers.append(conv0)
 
@@ -238,9 +247,9 @@ def resnet(inputs,
             for i in range(n):
                 with tf.variable_scope('conv1_%d' %i, reuse=reuse):
                     if i == 0:
-                        conv1 = residual_block(layers[-1], 16, first_block=True)
+                        conv1 = residual_block(layers[-1], 16, first_block=True, bn_training=reuse)
                     else:
-                        conv1 = residual_block(layers[-1], 16)
+                        conv1 = residual_block(layers[-1], 16, bn_training=reuse)
                     #activation_summary(conv1)
                     layers.append(conv1)
 
@@ -250,7 +259,7 @@ def resnet(inputs,
 
             for i in range(n):
                 with tf.variable_scope('conv2_%d' %i, reuse=reuse):
-                    conv2 = residual_block(layers[-1], 32)
+                    conv2 = residual_block(layers[-1], 32, bn_training=reuse)
                     #activation_summary(conv2)
                     layers.append(conv2)
 
@@ -260,7 +269,7 @@ def resnet(inputs,
 
             for i in range(n):
                 with tf.variable_scope('conv3_%d' %i, reuse=reuse):
-                    conv3 = residual_block(layers[-1], 64)
+                    conv3 = residual_block(layers[-1], 64, bn_training=reuse)
                     layers.append(conv3)
 
                 assert conv3.get_shape().as_list()[1:] == [8, 8, 64]
@@ -272,7 +281,7 @@ def resnet(inputs,
         with tf.variable_scope('net_'+str(net_id), reuse=reuse):
             with tf.variable_scope('fc', reuse=reuse):
                 in_channel = layers[-1].get_shape().as_list()[-1]
-                bn_layer = batch_normalization_layer(layers[-1], in_channel)
+                bn_layer = batch_normalization_layer(layers[-1], is_training=reuse)
                 relu_layer = tf.nn.relu(bn_layer)
                 global_pool = tf.reduce_mean(relu_layer, [1, 2])
 

@@ -76,12 +76,12 @@ def clm_shared(inputs, out_channel, padding='SAME', l2_weight=1e-3, reuse=False)
             preds = inputs
             with tf.variable_scope('clm_layer_1', reuse=reuse):
                 preds = slim.conv2d(preds, out_channel, [3, 3], scope='conv1', padding=padding)
-                preds = batch_normalization_layer(preds, out_channel)
+                #preds = batch_normalization_layer(preds, out_channel)
                 preds = tf.nn.relu(preds)
 
             with tf.variable_scope('clm_layer_2', reuse=reuse):
                 preds = slim.conv2d(preds, out_channel, [3, 3], scope='conv2', padding=padding)
-                preds = batch_normalization_layer(preds, out_channel)
+                #preds = batch_normalization_layer(preds, out_channel)
                 preds = tf.nn.relu(preds)
     return preds
 

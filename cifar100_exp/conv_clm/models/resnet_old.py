@@ -6,34 +6,48 @@ This is the resnet structure
 '''
 import numpy as np
 import tensorflow as tf
-import clm
+#import clm
 #from hyper_parameters import *
 
 
 BN_EPSILON = 0.001
 
-def resnet20_mkb(inputs,
+def resnet20(inputs,
         net_id,
         emb_size=128,
         is_training=True,
         is_mkb_reuse=False,
-        scope="Resnet20-mkb"):
-    return resnet_mkb(inputs, net_id, emb_size, is_training, is_mkb_reuse, scope, num_layers=20)
+        scope='Resnet20'):
+    return resnet(inputs, net_id, emb_size, is_training, scope, num_layers=20)
 
-def resnet32_mkb(inputs,
+def resnet32(inputs,
         net_id,
         emb_size=128,
         is_training=True,
         is_mkb_reuse=False,
-        scope="Resnet32-mkb"):
-    return resnet_mkb(inputs, net_id, emb_size, is_training, is_mkb_reuse, scope, num_layers=32)
+        scope='Resnet32'):
+    return resnet(inputs, net_id, emb_size, is_training, scope, num_layers=32)
 
+def resnet44(inputs,
+        net_id,
+        emb_size=128,
+        is_training=True,
+        is_mkb_reuse=False,
+        scope='Resnet44'):
+    return resnet(inputs, net_id, emb_size, is_training, scope, num_layers=44)
 
-def resnet_mkb(inputs,
+def resnet56(inputs,
+        net_id,
+        emb_size=128,
+        is_training=True,
+        is_mkb_reuse=False,
+        scope='Resnet56'):
+    return resnet(inputs, net_id, emb_size, is_training, scope, num_layers=56)
+
+def resnet(inputs,
         net_id,
         emb_size,
         is_training,
-        is_mkb_reuse,
         scope,
         num_layers):
 
@@ -84,7 +98,6 @@ def resnet_mkb(inputs,
         return fc_h
 
 
-    """
     def batch_normalization_layer(input_layer, dimension):
         '''
         Helper function to do batch normalziation
@@ -100,17 +113,9 @@ def resnet_mkb(inputs,
         bn_layer = tf.nn.batch_normalization(input_layer, mean, variance, beta, gamma, BN_EPSILON)
 
         return bn_layer
-    """
-
-    def batch_normalization_layer(input_layer, is_training):
-        _BATCH_NORM_DECAY = 0.997
-        _BATCH_NORM_EPSILON = 1e-5
-        return tf.layers.batch_normalization(
-                inputs=input_layer, axis=3, momentum=_BATCH_NORM_DECAY, epsilon=_BATCH_NORM_EPSILON,
-                center=True, scale=True, training=is_training, fused=True)
 
 
-    def conv_bn_relu_layer(input_layer, filter_shape, stride, bn_training):
+    def conv_bn_relu_layer(input_layer, filter_shape, stride):
         '''
         A helper function to conv, batch normalize and relu the input tensor sequentially
         :param input_layer: 4D tensor
@@ -123,13 +128,13 @@ def resnet_mkb(inputs,
         filter = create_variables(name='conv', shape=filter_shape)
 
         conv_layer = tf.nn.conv2d(input_layer, filter, strides=[1, stride, stride, 1], padding='SAME')
-        bn_layer = batch_normalization_layer(conv_layer, is_training=bn_training)
+        bn_layer = batch_normalization_layer(conv_layer, out_channel)
 
         output = tf.nn.relu(bn_layer)
         return output
 
 
-    def bn_relu_conv_layer(input_layer, filter_shape, stride, bn_training):
+    def bn_relu_conv_layer(input_layer, filter_shape, stride):
         '''
         A helper function to batch normalize, relu and conv the input layer sequentially
         :param input_layer: 4D tensor
@@ -140,7 +145,7 @@ def resnet_mkb(inputs,
 
         in_channel = input_layer.get_shape().as_list()[-1]
 
-        bn_layer = batch_normalization_layer(input_layer, is_training=bn_training)
+        bn_layer = batch_normalization_layer(input_layer, in_channel)
         relu_layer = tf.nn.relu(bn_layer)
 
         filter = create_variables(name='conv', shape=filter_shape)
@@ -149,7 +154,7 @@ def resnet_mkb(inputs,
 
 
 
-    def residual_block(input_layer, output_channel, first_block=False, bn_training=True):
+    def residual_block(input_layer, output_channel, first_block=False):
         '''
         Defines a residual block in ResNet
         :param input_layer: 4D tensor
@@ -175,10 +180,10 @@ def resnet_mkb(inputs,
                 filter = create_variables(name='conv', shape=[3, 3, input_channel, output_channel])
                 conv1 = tf.nn.conv2d(input_layer, filter=filter, strides=[1, 1, 1, 1], padding='SAME')
             else:
-                conv1 = bn_relu_conv_layer(input_layer, [3, 3, input_channel, output_channel], stride, bn_training=bn_training)
+                conv1 = bn_relu_conv_layer(input_layer, [3, 3, input_channel, output_channel], stride)
 
         with tf.variable_scope('conv2_in_block'):
-            conv2 = bn_relu_conv_layer(conv1, [3, 3, output_channel, output_channel], 1, bn_training=bn_training)
+            conv2 = bn_relu_conv_layer(conv1, [3, 3, output_channel, output_channel], 1)
 
         # When the channels of input layer and conv2 does not match, we add zero pads to increase the
         #  depth of input layers
@@ -194,7 +199,7 @@ def resnet_mkb(inputs,
         return output
 
 
-    def inference(input_tensor_batch, net_id, n, reuse, mkb_reuse):
+    def inference(input_tensor_batch, net_id, n, reuse):
         '''
         The main function that defines the ResNet. total layers = 1 + 2n + 2n + 2n +1 = 6n + 2
         :param input_tensor_batch: 4D tensor
@@ -209,93 +214,69 @@ def resnet_mkb(inputs,
         #dataset = "mnist"
         dataset = 'cifar'
         #dataset = 'stl10'
-        #with tf.variable_scope('net_'+str(net_id), reuse=reuse):
-        with tf.variable_scope('net_'+str(net_id) + '/conv0', reuse=reuse):
-            if dataset == 'mnist':
-                input_tensor_batch = tf.pad(input_tensor_batch, [[0, 0], [2, 2], [2, 2], [0, 0]])
-                input_tensor_batch = tf.cast(input_tensor_batch, tf.float32) / 255.0
-                conv0 = conv_bn_relu_layer(input_tensor_batch, [3, 3, 1, 16], 1, bn_training=reuse)
-            elif dataset == 'cifar':
-                mean = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32, shape=[1, 1, 1, 3], name='img_mean')
-                input_tensor_batch = input_tensor_batch - mean
-                conv0 = conv_bn_relu_layer(input_tensor_batch, [3, 3, 3, 16], 1, bn_training=reuse)
-            elif dataset == 'stl10':
-                input_tensor_batch = tf.image.resize_images(input_tensor_batch, tf.constant([32, 32]), method=tf.image.ResizeMethod.BILINEAR)
-                mean = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32, shape=[1, 1, 1, 3], name='img_mean')
-                input_tensor_batch = input_tensor_batch - mean
-                conv0 = conv_bn_relu_layer(input_tensor_batch, [3, 3, 3, 16], 1, bn_training=reuse)
-            #activation_summary(conv0)
-            layers.append(conv0)
+        with tf.variable_scope('net_'+str(net_id), reuse=reuse):
+            with tf.variable_scope('conv0', reuse=reuse):
+                if dataset == 'mnist':
+                    input_tensor_batch = tf.pad(input_tensor_batch, [[0, 0], [2, 2], [2, 2], [0, 0]])
+                    input_tensor_batch = tf.cast(input_tensor_batch, tf.float32) / 255.0
+                    conv0 = conv_bn_relu_layer(input_tensor_batch, [3, 3, 1, 16], 1)
+                elif dataset == 'cifar':
+                    mean = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32, shape=[1, 1, 1, 3], name='img_mean')
+                    input_tensor_batch = input_tensor_batch - mean
+                    conv0 = conv_bn_relu_layer(input_tensor_batch, [3, 3, 3, 16], 1)
+                elif dataset == 'stl10':
+                    input_tensor_batch = tf.image.resize_images(input_tensor_batch, tf.constant([32, 32]), method=tf.image.ResizeMethod.BILINEAR)
+                    mean = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32, shape=[1, 1, 1, 3], name='img_mean')
+                    input_tensor_batch = input_tensor_batch - mean
+                    conv0 = conv_bn_relu_layer(input_tensor_batch, [3, 3, 3, 16], 1)
+                #activation_summary(conv0)
+                layers.append(conv0)
 
-        print('-------------conv0--------------------')
-        print(layers[-1])
+            print('-------------conv0--------------------')
+            print(layers[-1])
 
-        for i in range(n):
-            with tf.variable_scope('net_'+str(net_id) + '/conv1_%d' %i, reuse=reuse):
-                if i == 0:
-                    conv1 = residual_block(layers[-1], 16, first_block=True, bn_training=reuse)
-                else:
-                    conv1 = residual_block(layers[-1], 16, bn_training=reuse)
-                #activation_summary(conv1)
-                layers.append(conv1)
+            for i in range(n):
+                with tf.variable_scope('conv1_%d' %i, reuse=reuse):
+                    if i == 0:
+                        conv1 = residual_block(layers[-1], 16, first_block=True)
+                    else:
+                        conv1 = residual_block(layers[-1], 16)
+                    #activation_summary(conv1)
+                    layers.append(conv1)
 
-        print('-------------conv1--------------------')
-        print(layers[-1])
+            print('-------------conv1--------------------')
+            print(layers[-1])
+            res.append(layers[-1])
 
-        ######################MKB 1################################################
-        print('mkb_reuse', mkb_reuse)
-        with tf.variable_scope('mkb-1', reuse=mkb_reuse):
-            mkb1 = clm.clm_shared(layers[-1], 16, padding='SAME')
-            mkb1 = mkb1 + layers[-1]
-            layers.append(mkb1)
-        ######################MKB 1################################################
-        res.append(layers[-1])
+            for i in range(n):
+                with tf.variable_scope('conv2_%d' %i, reuse=reuse):
+                    conv2 = residual_block(layers[-1], 32)
+                    #activation_summary(conv2)
+                    layers.append(conv2)
 
-        for i in range(n):
-            with tf.variable_scope('net_'+str(net_id)+'/conv2_%d' %i, reuse=reuse):
-                conv2 = residual_block(layers[-1], 32, bn_training=reuse)
-                #activation_summary(conv2)
-                layers.append(conv2)
+            print('-------------conv2--------------------')
+            print(layers[-1])
+            res.append(layers[-1])
 
-        print('-------------conv2--------------------')
-        print(layers[-1])
+            for i in range(n):
+                with tf.variable_scope('conv3_%d' %i, reuse=reuse):
+                    conv3 = residual_block(layers[-1], 64)
+                    layers.append(conv3)
 
-        ######################MKB 2################################################
-        with tf.variable_scope('mkb-2', reuse=mkb_reuse):
-            mkb2 = clm.clm_shared(layers[-1], 32, padding='SAME')
-            mkb2 = mkb2 + layers[-1]
-            layers.append(mkb2)
-        ######################MKB 2################################################
-        res.append(layers[-1])
+                assert conv3.get_shape().as_list()[1:] == [8, 8, 64]
 
-        for i in range(n):
-            with tf.variable_scope('net_'+str(net_id)+'/conv3_%d' %i, reuse=reuse):
-                conv3 = residual_block(layers[-1], 64, bn_training=reuse)
-                layers.append(conv3)
-
-            assert conv3.get_shape().as_list()[1:] == [8, 8, 64]
-
-        print('-------------conv3--------------------')
-        print(layers[-1])
-
-        ######################MKB 3################################################
-        with tf.variable_scope('mkb-3', reuse=mkb_reuse):
-            mkb3 = clm.clm_shared(layers[-1], 64, padding='SAME')
-            mkb3 = mkb3 + layers[-1]
-            layers.append(mkb3)
-        ######################MKB ################################################
-        res.append(layers[-1])
-
+            print('-------------conv3--------------------')
+            print(layers[-1])
+            res.append(layers[-1])
 
         with tf.variable_scope('net_'+str(net_id), reuse=reuse):
             with tf.variable_scope('fc', reuse=reuse):
                 in_channel = layers[-1].get_shape().as_list()[-1]
-                bn_layer = batch_normalization_layer(layers[-1], is_training=reuse)
+                bn_layer = batch_normalization_layer(layers[-1], in_channel)
                 relu_layer = tf.nn.relu(bn_layer)
                 global_pool = tf.reduce_mean(relu_layer, [1, 2])
 
                 #layers.append(global_pool)
-                print(global_pool)
                 assert global_pool.get_shape().as_list()[-1:] == [64]
                 output = output_layer(global_pool, emb_size)
                 layers.append(output)
@@ -307,10 +288,17 @@ def resnet_mkb(inputs,
 
     if num_layers == 20:
         print('\n==================Resnet 20==============================')
-        return inference(inputs, net_id, 3, is_training, is_mkb_reuse)
+        return inference(inputs, net_id, 3, is_training)
     elif num_layers == 32:
         print('\n==================Resnet 32==============================')
-        return inference(inputs, net_id, 5, is_training, is_mkb_reuse)
+        return inference(inputs, net_id, 5, is_training)
+    elif num_layers == 44:
+        print('\n==================Resnet 44==============================')
+        return inference(inputs, net_id, 7, is_training)
+    elif num_layers == 56:
+        print('\n==================Resnet 56==============================')
+        return inference(inputs, net_id, 9, is_training)
+
 
 """
 def test_graph(train_dir='logs'):
