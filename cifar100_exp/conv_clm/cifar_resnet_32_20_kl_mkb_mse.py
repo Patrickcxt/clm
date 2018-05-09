@@ -128,12 +128,18 @@ def main(_):
     """
 
 
+    """
     t_learning_rate = tf.train.exponential_decay(
         FLAGS.learning_rate,
         model.step[0],
         FLAGS.decay_steps,
         FLAGS.decay_factor,
         staircase=True)
+    """
+    t_learning_rate = tf.train.piecewise_constant(
+        model.step[0],
+        [48000, 64000],
+        [1e-1, 1e-2, 1e-3])
     train_op = model.create_train_op_type(t_learning_rate,'all')
     #train_op = model.create_train_op(t_learning_rate)
 
@@ -142,7 +148,7 @@ def main(_):
 
     summary_writer = tf.summary.FileWriter(FLAGS.logdir+'/summaries/', graph)
 
-    saver = tf.train.Saver(max_to_keep=10)
+    saver = tf.train.Saver(max_to_keep=20)
 
   gpuConfig = tf.ConfigProto()
   gpuConfig.gpu_options.allow_growth = True
@@ -221,7 +227,7 @@ def main(_):
             summary_writer.add_summary(valid_summary_0, step)
             summary_writer.add_summary(valid_summary_1, step)
 
-        if (step + 1) % 10000 == 0:
+          if (step + 1) % 10000 == 0:
             saver.save(sess, FLAGS.logdir+'/models/model', model.step[0])
 
         print('=====================Test Error===============================')

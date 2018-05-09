@@ -155,7 +155,7 @@ def main(_):
             summary_writer.add_summary(summaries, step)
             summary_writer.add_summary(valid_summary_0, step)
 
-        if (step+1) % 10000 == 0:
+          if (step+1) % 10000 == 0:
             saver.save(sess, FLAGS.logdir+'/models/model', model.step[0])
 
         print('=========================Test Error+==============================')
