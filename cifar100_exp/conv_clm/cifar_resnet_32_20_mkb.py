@@ -48,7 +48,7 @@ flags.DEFINE_float('decay_factor', 0.1, 'Learning rate decay factor.')
 flags.DEFINE_float('decay_steps', 30000,
                    'Learning rate decay interval in steps.')
 
-flags.DEFINE_integer('max_steps', 100000, 'Number of training steps.')
+flags.DEFINE_integer('max_steps', 80000, 'Number of training steps.')
 
 flags.DEFINE_string('logdir', '/tmp/semisup_mnist', 'Training log path.')
 
@@ -57,8 +57,9 @@ flags.DEFINE_string('subset', 'train', 'Training or test.')
 from tools import cifar as cifar_tools
 #from conviz import conviz
 from data_layer import data_layer
-from models import resnet_mkb as resnet_mkb
 #from models import resnet_mkb_old as resnet_mkb
+from models import resnet_mkb as resnet_mkb
+from models import resnet as resnet
 
 NUM_LABELS = cifar_tools.NUM_LABELS
 IMAGE_SHAPE = cifar_tools.IMAGE_SHAPE
@@ -85,6 +86,7 @@ def main(_):
   graph = tf.Graph()
   with graph.as_default():
     model_func = [resnet_mkb.resnet32_mkb, resnet_mkb.resnet20_mkb]
+    #model_func = [resnet.resnet32, resnet.resnet20]
     model = backend.SemisupModel(model_func, NUM_LABELS, IMAGE_SHAPE)
 
     # Set up inputs.
@@ -104,26 +106,10 @@ def main(_):
     # Add losses after final prediction.
     model.add_logit_loss(0, sup_logit_0, sup_labels_0)
     model.add_logit_loss(1, sup_logit_1, sup_labels_1)
-    model.add_kl_loss(0, sup_logit_1, sup_logit_0, weight=0.01)
-    model.add_kl_loss(1, sup_logit_0, sup_logit_1, weight=0.01)
+    #model.add_kl_loss(0, sup_logit_1, sup_logit_0, weight=0.01)
+    #model.add_kl_loss(1, sup_logit_0, sup_logit_1, weight=0.01)
 
     # Add losses after between clm
-    """
-    sup_shared_0 = slim.flatten(sup_shared_0, scope='kl_flatten_0')
-    #sup_shared_0 = model.shared_to_embedding(sup_shared_0, 128, is_training=False)
-    sup_shared_0 = tf.nn.l2_normalize(sup_shared_0, 1, 1e-10, name='shared_emb_0')
-    sup_shared_1 = slim.flatten(sup_shared_1, scope='kl_flatten_1')
-    #sup_shared_1 = model.shared_to_embedding(sup_shared_1, 128, is_training=True)
-    sup_shared_1 = tf.nn.l2_normalize(sup_shared_1, 1, 1e-10, name='shared_emb_1')
-
-    print('------------sup_shared_emb------------------')
-    print(sup_shared_0)
-    print(sup_shared_1)
-
-    model.add_cosine_loss(0, sup_shared_0, sup_shared_1, weight=1)
-    model.add_cosine_loss(1, sup_shared_1, sup_shared_0, weight=1)
-    """
-
 
     """
     t_learning_rate = tf.train.exponential_decay(
@@ -135,17 +121,20 @@ def main(_):
     """
     t_learning_rate = tf.train.piecewise_constant(
         model.step[0],
-        [54000, 70000],
+        [48000, 64000],
         [1e-1, 1e-2, 1e-3])
-    train_op = model.create_train_op_type(t_learning_rate,'kl')
+    train_op = model.create_train_op_type(t_learning_rate,'base') # only classification loss
     #train_op = model.create_train_op(t_learning_rate)
+
+    print('\n\n-----------------------Variables-----------------------------\n\n')
     params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="mkb-1")
     print(params)
+    print('\n\n-----------------------Variables-----------------------------\n\n')
+
 
     summary_op = tf.summary.merge_all()
 
     summary_writer = tf.summary.FileWriter(FLAGS.logdir+'/summaries/', graph)
-
 
     saver = tf.train.Saver(max_to_keep=10)
 
@@ -163,18 +152,26 @@ def main(_):
         for step in xrange(FLAGS.max_steps):
 
           images_0, labels_0 = dl.get_next_batch(0)
-          _, total_losses, logit_losses,  kl_losses, summaries = sess.run([train_op, model.train_loss, model.logit_loss,  model.kl_loss, summary_op],
+          _, total_losses, logit_losses, summaries = sess.run([train_op, model.train_loss, model.logit_loss, summary_op],
                                                           feed_dict={sup_images_0: images_0,
                                                                      sup_labels_0: labels_0,
                                                                      sup_images_1: images_0,
                                                                      sup_labels_1: labels_0})
 
+          """
+          print('Step: ', step)
+          print('total_loss: ', total_losses)
+          print('logit_loss: ', logit_losses)
+          print('cosine_loss: ', cosine_losses)
+          #print('mse_loss: ', mse_losses)
+          #print('kl_loss: ', kl_losses)
+          """
           if step % 100 == 0:
             print('Step: ', step)
             print('total_loss: ', total_losses)
             print('logit_loss: ', logit_losses)
             #print('cosine_loss: ', cosine_losses)
-            print('kl_loss: ', kl_losses)
+            #print('kl_loss: ', kl_losses)
             #print('mse_loss: ', mse_losses)
             #print('kl_loss: ' + str(kl_losses_0) + ' ' + str(kl_losses_1))
             #print('visit_loss: ' + str(visit_losses[0]) + ' ' + str(visit_losses[1]))
@@ -225,8 +222,8 @@ def main(_):
         test_err_0, test_err_1 = valid_and_test(model, test_images, test_labels)
         print('Test error: %.2f %%, %.2f%%' % (test_err_0, test_err_1))
     else:
-        saver.restore(sess, './save_newbn/r32_r20_kl_mkb/bn=1e-4_54k_70k_10k/models/model-93223')
-        #saver.restore(sess, './save_cifar100/r32_r20_kl_mkb/models/model-10000')
+        #saver.restore(sess, './save_newbn/r32_r20/models/model-100000')
+        saver.restore(sess, './save_cifar100/r32_r20/models/model-48000')
         print('=====================Test Error===============================')
         test_err_0, test_err_1 = valid_and_test(model, test_images, test_labels)
         print('Test error: %.2f %%, %.2f%%' % (test_err_0, test_err_1))

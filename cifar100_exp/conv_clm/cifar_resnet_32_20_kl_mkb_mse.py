@@ -234,7 +234,7 @@ def main(_):
         test_err_0, test_err_1 = valid_and_test(model, test_images, test_labels)
         print('Test error: %.2f %%, %.2f%%' % (test_err_0, test_err_1))
     else:
-        saver.restore(sess, './save_cifar100/r32_r20_mse/models/model-71000')
+        saver.restore(sess, './save_newbn/r32_r20_kl_mkb_mse/bn=1e-3_48k_64k_100k/models/model-70000')
         print('=====================Test Error===============================')
         test_err_0, test_err_1 = valid_and_test(model, test_images, test_labels)
         print('Test error: %.2f %%, %.2f%%' % (test_err_0, test_err_1))

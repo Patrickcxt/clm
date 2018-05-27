@@ -104,7 +104,7 @@ def resnet_mkb(inputs,
 
     def batch_normalization_layer(input_layer, is_training):
         _BATCH_NORM_DECAY = 0.997
-        _BATCH_NORM_EPSILON = 1e-5
+        _BATCH_NORM_EPSILON = 1e-4
         return tf.layers.batch_normalization(
                 inputs=input_layer, axis=3, momentum=_BATCH_NORM_DECAY, epsilon=_BATCH_NORM_EPSILON,
                 center=True, scale=True, training=is_training, fused=True)
@@ -245,7 +245,7 @@ def resnet_mkb(inputs,
         ######################MKB 1################################################
         print('mkb_reuse', mkb_reuse)
         with tf.variable_scope('mkb-1', reuse=mkb_reuse):
-            mkb1 = clm.clm_shared(layers[-1], 16, padding='SAME')
+            mkb1 = clm.clm_shared(layers[-1], 16, padding='SAME', is_train=reuse)
             mkb1 = mkb1 + layers[-1]
             layers.append(mkb1)
         ######################MKB 1################################################
@@ -262,7 +262,7 @@ def resnet_mkb(inputs,
 
         ######################MKB 2################################################
         with tf.variable_scope('mkb-2', reuse=mkb_reuse):
-            mkb2 = clm.clm_shared(layers[-1], 32, padding='SAME')
+            mkb2 = clm.clm_shared(layers[-1], 32, padding='SAME', is_train=reuse)
             mkb2 = mkb2 + layers[-1]
             layers.append(mkb2)
         ######################MKB 2################################################
@@ -280,7 +280,7 @@ def resnet_mkb(inputs,
 
         ######################MKB 3################################################
         with tf.variable_scope('mkb-3', reuse=mkb_reuse):
-            mkb3 = clm.clm_shared(layers[-1], 64, padding='SAME')
+            mkb3 = clm.clm_shared(layers[-1], 64, padding='SAME', is_train=reuse)
             mkb3 = mkb3 + layers[-1]
             layers.append(mkb3)
         ######################MKB ################################################

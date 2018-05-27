@@ -444,6 +444,8 @@ class SemisupModel(object):
         self.train_loss = tf.losses.get_total_loss() + tf.add_n(self.mse_loss + self.kl_loss[0] + self.kl_loss[1])
     elif tp == 'cosine':
         self.train_loss = tf.losses.get_total_loss()
+    elif tp == 'base':
+        self.train_loss = tf.losses.get_total_loss()
 
 
     #self.train_loss_average = self.add_average(self.train_loss)
@@ -454,8 +456,11 @@ class SemisupModel(object):
 
     #trainer = tf.train.AdamOptimizer(learning_rate)
     trainer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
-
-    self.train_op = slim.learning.create_train_op(self.train_loss, trainer, global_step=self.step[0])
+    extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    print('-------------UPDATE_OPS---------------------')
+    print(extra_update_ops)
+    with tf.control_dependencies(extra_update_ops):
+        self.train_op = slim.learning.create_train_op(self.train_loss, trainer, global_step=self.step[0])
     return self.train_op
 
 

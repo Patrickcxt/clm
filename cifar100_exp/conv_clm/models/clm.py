@@ -18,24 +18,13 @@ from scipy.misc.pilutil import imshow
 
 
 #from tfutils import w, b
-BN_EPSILON = 0.001
 
-def batch_normalization_layer(input_layer, dimension):
-    '''
-    Helper function to do batch normalziation
-    :param input_layer: 4D tensor
-    :param dimension: input_layer.get_shape().as_list()[-1]. The depth of the 4D tensor
-    :return: the 4D tensor after being normalized
-    '''
-    mean, variance = tf.nn.moments(input_layer, axes=[0, 1, 2])
-    beta = tf.get_variable('beta', dimension, tf.float32,
-                               initializer=tf.constant_initializer(0.0, tf.float32))
-    gamma = tf.get_variable('gamma', dimension, tf.float32,
-                                initializer=tf.constant_initializer(1.0, tf.float32))
-    bn_layer = tf.nn.batch_normalization(input_layer, mean, variance, beta, gamma, BN_EPSILON)
-
-    return bn_layer
-
+def batch_normalization_layer(input_layer, is_training):
+    _BATCH_NORM_DECAY = 0.997
+    _BATCH_NORM_EPSILON = 1e-3
+    return tf.layers.batch_normalization(
+        inputs=input_layer, axis=3, momentum=_BATCH_NORM_DECAY, epsilon=_BATCH_NORM_EPSILON,
+        center=True, scale=True, training=is_training, fused=True)
 
 def encoder(inputs, out_channel, stride, padding, l2_weight=1e-3):
     with slim.arg_scope([slim.conv2d],
@@ -69,19 +58,19 @@ def clm_dec(inputs, net_id, out_channel,  stride=[1, 1, 1, 1], padding='SAME', i
         #return decoder(inputs, out_channel, out_shape, stride, padding)
         return encoder(inputs, out_channel, stride, padding)
 
-def clm_shared(inputs, out_channel, padding='SAME', l2_weight=1e-3, reuse=False):
+def clm_shared(inputs, out_channel, padding='SAME', l2_weight=1e-3, reuse=False, is_train=True):
     with slim.arg_scope([slim.conv2d],
             activation_fn=None,
             weights_regularizer=slim.l2_regularizer(l2_weight)):
             preds = inputs
             with tf.variable_scope('clm_layer_1', reuse=reuse):
                 preds = slim.conv2d(preds, out_channel, [3, 3], scope='conv1', padding=padding)
-                #preds = batch_normalization_layer(preds, out_channel)
+                #preds = batch_normalization_layer(preds, is_training=is_train)
                 preds = tf.nn.relu(preds)
 
             with tf.variable_scope('clm_layer_2', reuse=reuse):
                 preds = slim.conv2d(preds, out_channel, [3, 3], scope='conv2', padding=padding)
-                #preds = batch_normalization_layer(preds, out_channel)
+                #preds = batch_normalization_layer(preds, is_training=is_train)
                 preds = tf.nn.relu(preds)
     return preds
 

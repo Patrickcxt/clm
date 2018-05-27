@@ -85,7 +85,7 @@ def main(_):
   graph = tf.Graph()
   with graph.as_default():
     #model_func = [resnet.resnet32]
-    model_func = [resnet_mkb.resnet20_mkb]
+    model_func = [resnet_mkb.resnet32_mkb]
     model = backend.SemisupModel(model_func, NUM_LABELS, IMAGE_SHAPE)
 
     # Set up inputs.
